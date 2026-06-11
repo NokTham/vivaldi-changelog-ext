@@ -8,7 +8,7 @@ A Chromium browser extension that automatically fetches and injects the **full c
 
 When you open a Vivaldi release announcement thread on `forum.vivaldi.net`, the extension:
 
-1. Detects that the first post contains a link to a Vivaldi blog snapshot post.
+1. Detects that the first post contains a link to a Vivaldi blog release announcement post.
 2. Fetches that blog post in the background.
 3. Parses the changelog and download sections.
 4. Injects the full changelog inline inside the forum post — no need to open a second tab.
