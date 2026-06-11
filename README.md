@@ -1,19 +1,19 @@
 # Vivaldi Changelog Expander
 
-A Chromium browser extension that automatically fetches and injects the **full changelog** from Vivaldi's blog directly into snapshot announcement threads on the Vivaldi forum.
+A Chromium browser extension that automatically fetches and injects the **full changelog** from Vivaldi's blog directly into release announcement threads on the Vivaldi forum.
 
 ![Image](https://i.imgur.com/laVfIGL.png)
 
 ## What it does
 
-When you open a Vivaldi snapshot announcement thread on `forum.vivaldi.net`, the extension:
+When you open a Vivaldi release announcement thread on `forum.vivaldi.net`, the extension:
 
 1. Detects that the first post contains a link to a Vivaldi blog snapshot post.
 2. Fetches that blog post in the background.
 3. Parses the changelog and download sections.
 4. Injects the full changelog inline inside the forum post — no need to open a second tab.
 
-This works for **every** snapshot/update post automatically, past and future.
+This works for **every** release announcement post automatically.
 
 ## Features
 
@@ -37,6 +37,6 @@ Since this extension is not on the Chrome Web Store, install it as an unpacked e
 
 ## How it works
 
-The content script (`content.js`) runs on `forum.vivaldi.net`. It watches for the first post of each thread and checks whether it contains a link to a Vivaldi blog snapshot post. If found, it fetches that page, parses the `<h3>` + `<ul>` structure that Vivaldi consistently uses for changelogs, and injects the result as a styled block at the bottom of the post content.
+The content script (`content.js`) runs on `forum.vivaldi.net`. It watches for the first post of each thread and checks whether it contains a link to a Vivaldi blog release post. If found, it fetches that page, parses the `<h3>` + `<ul>` structure that Vivaldi consistently uses for changelogs, and injects the result as a styled block at the bottom of the post content.
 
 A `MutationObserver` handles cases where the page is navigated without a full reload (NodeBB's SPA routing).
