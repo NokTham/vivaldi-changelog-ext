@@ -13,7 +13,7 @@ When you open a Vivaldi release announcement thread on `forum.vivaldi.net`, the 
 3. Parses the changelog and download sections.
 4. Injects the full changelog inline inside the forum post — no need to open a second tab.
 
-This works for **every** release announcement post automatically.
+This works for most release announcement posts.
 
 ## Features
 
