@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Vivaldi Changelog Expander",
+  "description": "Replaces the Vivaldi forum snapshot post with the full changelog from the blog post.",
+  "version": "1.1.0",
+  "permissions": [],
+  "host_permissions": [
+    "https://forum.vivaldi.net/*",
+    "https://vivaldi.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://forum.vivaldi.net/*"],
+      "js": ["content.js"],
+      "css": ["changelog.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

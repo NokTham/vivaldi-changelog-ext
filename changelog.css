@@ -1,0 +1,321 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Vivaldi Changelog Expander — injected styles
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Separator */
+.vcl-sep {
+  margin: 1.5rem 0 0;
+  border: none;
+  border-top: 2px solid #ef3939;
+  opacity: 0.25;
+}
+
+/* ── Wrapper ──────────────────────────────────────────────────────────────── */
+.vcl-changelog {
+  margin-top: 0.75rem;
+  border: 1.5px solid rgba(239, 57, 57, 0.18);
+  border-radius: 8px;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 0.875rem;
+  background: rgba(239, 57, 57, 0.03);
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+  animation: vcl-fade-in 0.3s ease;
+}
+
+@keyframes vcl-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+.vcl-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.9rem;
+  background: linear-gradient(90deg, #ef3939 0%, #c0392b 100%);
+  color: #fff;
+  flex-wrap: wrap;
+}
+
+.vcl-badge-wrap {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.vcl-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.vcl-badge-platform {
+  background: rgba(255,255,255,0.25);
+}
+
+.vcl-badge-type {
+  background: rgba(0,0,0,0.18);
+}
+
+.vcl-version {
+  font-size: 0.78rem;
+  font-weight: 600;
+  opacity: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
+.vcl-source-link {
+  margin-left: auto;
+  color: rgba(255,255,255,0.85) !important;
+  font-size: 0.72rem;
+  text-decoration: none !important;
+  border-bottom: 1px solid rgba(255,255,255,0.35);
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.vcl-source-link:hover {
+  color: #fff !important;
+  border-color: #fff;
+}
+
+/* ── Sections ─────────────────────────────────────────────────────────────── */
+.vcl-section {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid rgba(239, 57, 57, 0.1);
+}
+
+.vcl-section:first-of-type {
+  border-top: none;
+}
+
+.vcl-section-heading {
+  margin: 0 0 0.55rem !important;
+  font-size: 0.7rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  color: #ef3939 !important;
+  font-family: system-ui, sans-serif !important;
+}
+
+/* ── Changelog list ───────────────────────────────────────────────────────── */
+.vcl-list {
+  margin: 0 !important;
+  padding-left: 1.1rem !important;
+  list-style: none !important;
+}
+
+.vcl-list li {
+  position: relative;
+  padding: 0.26rem 0 !important;
+  line-height: 1.5 !important;
+  color: var(--color-text, inherit) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  font-size: 0.82rem !important;
+}
+
+.vcl-list li:last-child {
+  border-bottom: none;
+}
+
+.vcl-list li::before {
+  content: '';
+  position: absolute;
+  left: -0.9rem;
+  top: 0.68rem;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #ef3939;
+  opacity: 0.5;
+}
+
+/* Ticket number badges — VB-, VAB-, VIB- etc. */
+.vcl-ticket {
+  display: inline-block;
+  font-size: 0.67rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #c0392b;
+  background: rgba(239, 57, 57, 0.08);
+  border: 1px solid rgba(239, 57, 57, 0.2);
+  border-radius: 4px;
+  padding: 0 4px;
+  margin-left: 3px;
+  white-space: nowrap;
+  vertical-align: middle;
+  line-height: 1.65;
+}
+
+/* ── Desktop download section ─────────────────────────────────────────────── */
+.vcl-downloads {
+  background: rgba(0,0,0,0.015);
+}
+
+.vcl-dl-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.vcl-dl-platform {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.vcl-dl-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text, #333);
+  min-width: 110px;
+  flex-shrink: 0;
+}
+
+.vcl-dl-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.vcl-dl-pill {
+  display: inline-block;
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #ef3939 !important;
+  background: rgba(239, 57, 57, 0.07);
+  border: 1.5px solid rgba(239, 57, 57, 0.3);
+  border-radius: 4px;
+  padding: 2px 8px;
+  text-decoration: none !important;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.vcl-dl-pill:hover {
+  background: #ef3939 !important;
+  border-color: #ef3939 !important;
+  color: #fff !important;
+}
+
+/* ── Mobile / store download buttons ─────────────────────────────────────── */
+.vcl-store-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.vcl-store-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 6px;
+  background: #ef3939;
+  color: #fff !important;
+  text-decoration: none !important;
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: background 0.15s, transform 0.1s;
+  border: none;
+}
+
+.vcl-store-btn:hover {
+  background: #c0392b !important;
+  transform: translateY(-1px);
+}
+
+.vcl-store-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.vcl-store-label {
+  color: #fff !important;
+}
+
+/* ── Loading indicator ────────────────────────────────────────────────────── */
+.vcl-loader {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 0.75rem;
+  padding: 0.5rem 0;
+  opacity: 0.65;
+  font-size: 0.8rem;
+  color: var(--color-text, inherit);
+}
+
+.vcl-loader-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #ef3939;
+  animation: vcl-bounce 1s infinite;
+}
+
+.vcl-loader-dot:nth-child(2) { animation-delay: 0.15s; }
+.vcl-loader-dot:nth-child(3) { animation-delay: 0.30s; }
+
+@keyframes vcl-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40%           { transform: translateY(-4px); opacity: 1; }
+}
+
+.vcl-loader-text { margin-left: 4px; }
+
+/* ── Error state ──────────────────────────────────────────────────────────── */
+.vcl-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid #f39c12;
+  background: rgba(243, 156, 18, 0.07);
+  border-radius: 0 4px 4px 0;
+  font-size: 0.8rem;
+  color: var(--color-text, inherit);
+  flex-wrap: wrap;
+}
+
+.vcl-error-icon { color: #f39c12; font-size: 1rem; }
+.vcl-error a { color: #ef3939 !important; text-decoration: underline !important; }
+
+/* ── Dark mode ────────────────────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  .vcl-changelog {
+    background: rgba(239, 57, 57, 0.04);
+    border-color: rgba(239, 57, 57, 0.22);
+  }
+  .vcl-sep { opacity: 0.2; }
+  .vcl-list li { border-color: rgba(255,255,255,0.06); }
+  .vcl-downloads { background: rgba(255,255,255,0.03); }
+  .vcl-ticket {
+    background: rgba(239, 57, 57, 0.12);
+    border-color: rgba(239, 57, 57, 0.28);
+    color: #ff6b6b;
+  }
+  .vcl-dl-label { color: rgba(255,255,255,0.8); }
+  .vcl-dl-pill {
+    background: rgba(239, 57, 57, 0.1);
+    border-color: rgba(239, 57, 57, 0.35);
+    color: #ff6b6b !important;
+  }
+  .vcl-dl-pill:hover {
+    background: #c0392b !important;
+    border-color: #c0392b !important;
+    color: #fff !important;
+  }
+  .vcl-store-btn:hover { background: #a93226 !important; }
+}
