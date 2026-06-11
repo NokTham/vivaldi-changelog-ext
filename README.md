@@ -2,6 +2,8 @@
 
 A Chromium browser extension that automatically fetches and injects the **full changelog** from Vivaldi's blog directly into snapshot announcement threads on the Vivaldi forum.
 
+![Image](https://i.imgur.com/laVfIGL.png)
+
 ## What it does
 
 When you open a Vivaldi snapshot announcement thread on `forum.vivaldi.net`, the extension:
