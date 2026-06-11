@@ -29,6 +29,7 @@
     { re: /apps\.apple\.com/,       label: 'App Store',    icon: '' },
     { re: /uptodown\.com/,          label: 'Uptodown',     icon: '⬇' },
     { re: /downloads\.vivaldi\.com/,label: null,           icon: '⬇' },
+    { re: /vivaldi\.com\/download/, label: 'Download Vivaldi', icon: '⬇' },
   ];
 
   // ── Helpers ───────────────────────────────────────────────────────────────
