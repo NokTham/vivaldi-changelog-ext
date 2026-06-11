@@ -22,7 +22,6 @@ This works for most release announcement posts.
 - ✅ Download links presented as clean pill buttons
 - ✅ Loading state while fetching
 - ✅ Graceful error fallback with direct blog link
-- ✅ Dark mode support
 - ✅ No tracking, no external services — just fetches the public blog post
 
 ## Installation (Developer / Unpacked)
