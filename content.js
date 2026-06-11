@@ -12,21 +12,26 @@
   // Any vivaldi.com blog post link
   const BLOG_LINK_RE = /^https?:\/\/vivaldi\.com\/blog\//i;
 
+  // Simple in-memory cache to prevent redundant fetches during a session
+  const changelogCache = new Map();
+
   // Ticket ID patterns across all platforms: VB-, VAB-, VIB-, etc.
-  const TICKET_RE_STR = 'V[A-Z]*B-\\d+';
+  const TICKET_RE_STR = 'V[A-Z]*B-\\d+'; // Keep this for highlighting
+  const TICKET_RE_G   = new RegExp(TICKET_RE_STR, 'g');
 
   // Headings that mean "these list items are downloads, not changelog"
   const DOWNLOAD_HEADING_RE = /download/i;
 
   // List items that look like changelog entries:
   // Start with [Category] or contain a ticket ID
+  // Using \s covers both standard spaces and non-breaking spaces (\u00A0)
   const CHANGELOG_ITEM_RE = /^\s*\[|V[A-Z]*B-\d+/;
 
   // Store / app distribution links
   const STORE_PATTERNS = [
     { re: /play\.google\.com/,      label: 'Google Play',  icon: '▶' },
-    { re: /testflight\.apple\.com/, label: 'TestFlight',   icon: '' },
-    { re: /apps\.apple\.com/,       label: 'App Store',    icon: '' },
+    { re: /testflight\.apple\.com/, label: 'TestFlight',   icon: '⬇' },
+    { re: /apps\.apple\.com/,       label: 'App Store',    icon: '⬇' },
     { re: /uptodown\.com/,          label: 'Uptodown',     icon: '⬇' },
     { re: /downloads\.vivaldi\.com/,label: null,           icon: '⬇' },
     { re: /vivaldi\.com\/download/, label: 'Download Vivaldi', icon: '⬇' },
@@ -50,8 +55,15 @@
     try { return new URL(el.getAttribute('href'), base).href; } catch { return null; }
   }
 
-  function cloneLi (li, blogUrl) {
-    const c = li.cloneNode(true);
+  function cloneLi (el, blogUrl) {
+    let c;
+    if (el.tagName === 'LI') {
+      c = el.cloneNode(true);
+    } else {
+      c = document.createElement('li');
+      const clone = el.cloneNode(true);
+      while (clone.firstChild) c.appendChild(clone.firstChild);
+    }
     for (const a of c.querySelectorAll('a[href]')) {
       const abs = absHref(a, blogUrl);
       if (abs) a.href = abs;
@@ -73,14 +85,16 @@
 
   function observeNewPosts () {
     new MutationObserver((mutations) => {
+      const postsToProcess = new Set();
       for (const { addedNodes } of mutations) {
         for (const node of addedNodes) {
           if (!(node instanceof HTMLElement)) continue;
-          if (node.matches('[component="post"][data-index="0"]')) tryExpandPost(node);
+          if (node.matches('[component="post"][data-index="0"]')) postsToProcess.add(node);
           const n = node.querySelector('[component="post"][data-index="0"]');
-          if (n) tryExpandPost(n);
+          if (n) postsToProcess.add(n);
         }
       }
+      postsToProcess.forEach(tryExpandPost);
     }).observe(document.body, { childList: true, subtree: true });
   }
 
@@ -100,7 +114,7 @@
     const loader = buildLoader();
     contentEl.appendChild(loader);
     try {
-      const data = await fetchChangelog(blogUrl);
+      const data = await getChangelog(blogUrl);
       loader.remove();
       injectChangelog(contentEl, data);
     } catch (err) {
@@ -111,33 +125,77 @@
 
   // ── Fetch & parse ─────────────────────────────────────────────────────────
 
+  async function getChangelog (blogUrl) {
+    if (changelogCache.has(blogUrl)) return changelogCache.get(blogUrl);
+    const data = await fetchChangelog(blogUrl);
+    changelogCache.set(blogUrl, data);
+    return data;
+  }
+
   async function fetchChangelog (blogUrl) {
-    const resp = await new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({ type: 'FETCH_URL', url: blogUrl }, (r) => {
+    const fetchHtml = (urlToFetch) => new Promise((resolve, reject) => { // Renamed parameter for clarity
+      chrome.runtime.sendMessage({ type: 'FETCH_URL', url: urlToFetch }, (r) => {
         if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
         else if (r?.error)            reject(new Error(r.error));
         else                          resolve(r);
       });
     });
 
-    const doc = new DOMParser().parseFromString(resp.html, 'text/html');
-    const entry = doc.querySelector('.entry-content');
-    if (!entry) throw new Error('Could not find blog post content.');
+    // 1. Fetch and parse the original blog post
+    const respBlog = await fetchHtml(blogUrl);
+    const docBlog = new DOMParser().parseFromString(respBlog.html, 'text/html');
 
-    const platform    = platformFromUrl(blogUrl);
-    const releaseType = releaseTypeFromUrl(blogUrl);
+    // 2. Extract store links from the original blog post (these are usually only on the blog post)
+    const blogEntry = docBlog.querySelector('.entry-content, .post-content, main, article, #content');
+    const storeLinks = blogEntry ? extractStoreLinks(blogEntry, blogUrl) : [];
+
+    // 3. Determine which document contains the main changelog content
+    let changelogDoc = docBlog;
+    let changelogSourceUrl = blogUrl; // The URL from which changelogDoc was fetched
+    // Match links containing "vivaldi.com/changelog" to catch both /changelog/ and /changelog- slugs
+    const fullLink = docBlog.querySelector('a[href*="vivaldi.com/changelog"]');
+
+    if (fullLink) {
+      // Prioritize the dedicated changelog page if a link is found
+      const fullChangelogUrl = fullLink.href;
+      const respFull = await fetchHtml(fullChangelogUrl);
+      changelogDoc = new DOMParser().parseFromString(respFull.html, 'text/html');
+      changelogSourceUrl = fullChangelogUrl;
+    }
+
+    // 4. Parse the changelog and download groups from the chosen document
+    const { changelogGroups, downloadGroups, version, platform, releaseType } =
+      parseChangelogAndDownloads(changelogDoc, changelogSourceUrl, blogUrl);
+
+    // 5. Combine all data
+    if (changelogGroups.length === 0 && downloadGroups.length === 0 && storeLinks.length === 0) {
+      // If we parsed a dedicated changelog page and it was empty, or if the blog post was empty.
+      // The error message now indicates which URL was ultimately parsed for content.
+      throw new Error(`No changelog content found in ${changelogSourceUrl}.`);
+    }
+
+    return { changelogGroups, downloadGroups, storeLinks, version, platform, releaseType, blogUrl };
+  }
+
+  // This function now only parses changelog and download sections, not store links
+  function parseChangelogAndDownloads (doc, contentSourceUrl, metadataSourceUrl) {
+    const entry = doc.querySelector('.entry-content, .post-content, main, article, #content');
+    if (!entry) return { changelogGroups: [], downloadGroups: [], storeLinks: [], version: null };
+
+    const platform    = platformFromUrl(metadataSourceUrl);
+    const releaseType = releaseTypeFromUrl(metadataSourceUrl);
 
     // Version: prefer a 4-part build number, fall back to 2-part x.x
     const versionMatch =
-      blogUrl.match(/\b(\d+\.\d+\.\d+[\.\d]*)\b/) ||
+      metadataSourceUrl.match(/\b(\d+\.\d+\.\d+[\.\d]*)\b/) ||
       doc.title.match(/\b(\d+\.\d+[\.\d]*)\b/);
     const version = versionMatch
       ? versionMatch[1].replace(/-/g, '.')
       : null;
 
     // ── Section walker ───────────────────────────────────────────────────────
-    // Walk every direct child of .entry-content in document order.
-    // Accumulate <li> items under the nearest preceding heading.
+    // Walk relevant elements in .entry-content in document order.
+    // Accumulate <li> items under the nearest preceding heading or summary.
     // A null heading means "no heading seen yet" — those items go into a
     // synthetic 'Changelog' group if they look like changelog entries.
 
@@ -149,18 +207,38 @@
       if (items.length) { groups.push({ heading, items }); items = []; }
     };
 
-    for (const el of entry.children) {
+    const elements = entry.querySelectorAll('h1, h2, h3, h4, h5, h6, summary, details, ul, ol, p'); // Already includes p
+    for (const el of elements) {
       const tag = el.tagName;
 
-      if (tag === 'H2' || tag === 'H3' || tag === 'H4') {
+      if (/^H[1-6]$/.test(tag) || tag === 'SUMMARY') {
         flush();
         heading = el.textContent.trim();
         continue;
       }
 
+      if (tag === 'DETAILS') {
+        // Don't treat <details> as a heading, but allow its children to be processed
+        continue;
+      }
       if (tag === 'UL' || tag === 'OL') {
+        // Skip nested lists to avoid double-processing items
+        if (el.parentElement.closest('ul, ol')) continue;
+
         for (const li of el.querySelectorAll(':scope > li')) {
-          items.push(cloneLi(li, blogUrl));
+          items.push(cloneLi(li, contentSourceUrl));
+        }
+        continue;
+      }
+
+      if (tag === 'P') {
+        // Skip paragraphs inside lists or summaries to avoid double-processing
+        // Also skip if it's a direct child of a details element, as it might be part of a summary-like structure
+        // or if it's empty (e.g., <p>&nbsp;</p>)
+        if (el.closest('ul, ol, summary') || el.parentElement.tagName === 'DETAILS' || el.textContent.trim() === '') continue;
+
+        if (CHANGELOG_ITEM_RE.test(el.textContent)) {
+          items.push(cloneLi(el, contentSourceUrl));
         }
         continue;
       }
@@ -183,10 +261,10 @@
       const clItems = g.items.filter(li => CHANGELOG_ITEM_RE.test(li.textContent));
 
       if (clItems.length > 0) {
-        changelogGroups.push({ heading: g.heading, items: clItems });
-      } else if (g.items.length > 0 && !g.heading) {
+        changelogGroups.push({ heading: g.heading, items: clItems }); // Found specific changelog items
+      } else if (g.items.length > 0 && !g.heading) { // Items with no heading, not matching changelog regex
         // Items under no heading that aren't changelog — ignore (likely store blurb)
-      } else if (g.items.length > 0) {
+      } else if (g.items.length > 0 && g.heading) { // Named group with items, but no specific changelog items
         // Named non-download group with no changelog items — pass through as-is
         // (e.g. "Known Issues", "Release candidate feedback")
         changelogGroups.push(g);
@@ -198,14 +276,7 @@
       if (!g.heading) g.heading = 'Changelog';
     }
 
-    // ── Store links (mobile) ─────────────────────────────────────────────────
-    const storeLinks = extractStoreLinks(entry, blogUrl);
-
-    if (changelogGroups.length === 0 && storeLinks.length === 0) {
-      throw new Error('No changelog content found in blog post.');
-    }
-
-    return { changelogGroups, downloadGroups, storeLinks, version, platform, releaseType, blogUrl };
+    return { changelogGroups, downloadGroups, version, platform, releaseType };
   }
 
   function extractStoreLinks (entry, blogUrl) {
@@ -213,18 +284,27 @@
     const seen  = new Set();
 
     for (const a of entry.querySelectorAll('a[href]')) {
-      const href = absHref(a, blogUrl);
-      if (!href || seen.has(href)) continue;
+      let href = absHref(a, blogUrl);
+      if (!href) continue;
+
+      // Ensure HTTPS for Vivaldi.com links
+      if (href.startsWith('http://vivaldi.com/')) {
+        href = href.replace('http://', 'https://');
+      }
+
+      // Normalize URL by removing query params, hashes, and trailing slashes for deduplication
+      const normalized = href.split(/[?#]/)[0].replace(/\/+$/, '');
+      if (seen.has(normalized)) continue;
 
       for (const { re, label, icon } of STORE_PATTERNS) {
-        if (re.test(href)) {
-          seen.add(href);
+        if (re.test(normalized)) {
+          seen.add(normalized);
           let text = label
             || a.textContent.trim()
-            || (href.match(/\.(\w+)(?:\?|$)/) || [])[1]?.toUpperCase()
-            || href;
+            || (normalized.match(/\.(\w+)(?:\?|$)/) || [])[1]?.toUpperCase()
+            || normalized;
           if (text.length > 40) text = text.slice(0, 38) + '…';
-          links.push({ href, label: text, icon });
+          links.push({ href: normalized, label: text, icon });
           break;
         }
       }
@@ -238,20 +318,62 @@
     const wrapper = document.createElement('div');
     wrapper.className = 'vcl-changelog';
 
+    // Detect navbar height dynamically (handles if user blocked/hid it)
+    const navbar = document.getElementById('header-menu');
+    const navHeight = (navbar && window.getComputedStyle(navbar).display !== 'none') 
+      ? navbar.offsetHeight : 0;
+    wrapper.style.setProperty('--vcl-offset', `${navHeight}px`);
+
     // Header
     const header = document.createElement('div');
     header.className = 'vcl-header';
 
     const badgeWrap = document.createElement('span');
     badgeWrap.className = 'vcl-badge-wrap';
-    badgeWrap.innerHTML = `
-      <span class="vcl-badge vcl-badge-platform">${platform.emoji} ${platform.label}</span>
-      <span class="vcl-badge vcl-badge-type">${releaseType}</span>
-    `;
+
+    const platformBadge = document.createElement('span');
+    platformBadge.className = 'vcl-badge vcl-badge-platform';
+    platformBadge.textContent = `${platform.emoji} ${platform.label}`;
+
+    const typeBadge = document.createElement('span');
+    typeBadge.className = 'vcl-badge vcl-badge-type';
+    typeBadge.textContent = releaseType;
+
+    badgeWrap.append(platformBadge, typeBadge);
 
     const versionSpan = document.createElement('span');
     versionSpan.className = 'vcl-version';
     versionSpan.textContent = version ? `v${version}` : '';
+
+    // Toggle Button
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'vcl-toggle-btn';
+    toggleBtn.setAttribute('aria-label', 'Toggle changelog visibility');
+    toggleBtn.textContent = 'Collapse';
+    toggleBtn.onclick = () => {
+      const isCollapsed = wrapper.classList.toggle('vcl-collapsed');
+      toggleBtn.textContent = isCollapsed ? 'Expand' : 'Collapse';
+    };
+
+    // Navigation Buttons
+    const navGroup = document.createElement('div');
+    navGroup.className = 'vcl-nav-group';
+
+    const btnUp = document.createElement('button');
+    btnUp.className = 'vcl-nav-btn';
+    btnUp.textContent = '↑';
+    btnUp.setAttribute('aria-label', 'Scroll to top of page');
+    btnUp.title = 'Scroll to top of page';
+    btnUp.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    const btnDown = document.createElement('button');
+    btnDown.className = 'vcl-nav-btn';
+    btnDown.textContent = '↓';
+    btnDown.setAttribute('aria-label', 'Scroll to bottom of changelog');
+    btnDown.title = 'Scroll to bottom of changelog';
+    btnDown.onclick = () => wrapper.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+    navGroup.append(btnUp, btnDown);
 
     const sourceLink = document.createElement('a');
     sourceLink.className = 'vcl-source-link';
@@ -260,7 +382,7 @@
     sourceLink.rel = 'noopener noreferrer';
     sourceLink.textContent = 'View blog post ↗';
 
-    header.append(badgeWrap, versionSpan, sourceLink);
+    header.append(badgeWrap, versionSpan, toggleBtn, navGroup, sourceLink);
     wrapper.appendChild(header);
 
     // Changelog sections
@@ -368,7 +490,15 @@
       btn.href = href;
       btn.target = '_blank';
       btn.rel = 'noopener noreferrer';
-      btn.innerHTML = `<span class="vcl-store-icon">${icon}</span><span class="vcl-store-label">${label}</span>`;
+
+    const iconEl = document.createElement('span');
+    iconEl.className = 'vcl-store-icon';
+    iconEl.textContent = icon;
+    const labelEl = document.createElement('span');
+    labelEl.className = 'vcl-store-label';
+    labelEl.textContent = label;
+
+    btn.append(iconEl, labelEl);
       row.appendChild(btn);
     }
     section.appendChild(row);
@@ -378,15 +508,15 @@
   // ── Ticket highlighting ───────────────────────────────────────────────────
 
   function highlightTickets (el) {
-    const re = new RegExp(TICKET_RE_STR, 'g');
     walkText(el, (node) => {
       const text = node.textContent;
-      re.lastIndex = 0;
-      if (!re.test(text)) return;
-      re.lastIndex = 0;
+      TICKET_RE_G.lastIndex = 0;
+      if (!TICKET_RE_G.test(text)) return;
+      
+      TICKET_RE_G.lastIndex = 0;
       const frag = document.createDocumentFragment();
       let last = 0;
-      for (const m of text.matchAll(new RegExp(TICKET_RE_STR, 'g'))) {
+      for (const m of text.matchAll(TICKET_RE_G)) {
         if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
         const tag = document.createElement('span');
         tag.className = 'vcl-ticket';
@@ -401,7 +531,10 @@
 
   function walkText (node, fn) {
     if (node.nodeType === Node.TEXT_NODE) { fn(node); return; }
-    if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'A') return;
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      // Skip links and already processed ticket badges to prevent double-wrapping
+      if (node.tagName === 'A' || node.classList.contains('vcl-ticket')) return;
+    }
     for (const child of [...node.childNodes]) walkText(child, fn);
   }
 
@@ -410,23 +543,41 @@
   function buildLoader () {
     const el = document.createElement('div');
     el.className = 'vcl-loader';
-    el.innerHTML = `
-      <span class="vcl-loader-dot"></span>
-      <span class="vcl-loader-dot"></span>
-      <span class="vcl-loader-dot"></span>
-      <span class="vcl-loader-text">Fetching full changelog…</span>
-    `;
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    
+    for (let i = 0; i < 3; i++) {
+      const dot = document.createElement('span');
+      dot.className = 'vcl-loader-dot';
+      el.appendChild(dot);
+    }
+
+    const text = document.createElement('span');
+    text.className = 'vcl-loader-text';
+    text.textContent = 'Fetching full changelog…';
+    el.appendChild(text);
+
     return el;
   }
 
   function injectError (contentEl, err, blogUrl) {
     const el = document.createElement('div');
     el.className = 'vcl-error';
-    el.innerHTML = `
-      <span class="vcl-error-icon">⚠</span>
-      <span>Could not load changelog.</span>
-      <a href="${blogUrl}" target="_blank" rel="noopener noreferrer">Open blog post ↗</a>
-    `;
+
+    const icon = document.createElement('span');
+    icon.className = 'vcl-error-icon';
+    icon.textContent = '⚠';
+
+    const text = document.createElement('span');
+    text.textContent = 'Could not load changelog.';
+
+    const link = document.createElement('a');
+    link.href = blogUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = 'Open blog post ↗';
+
+    el.append(icon, text, link);
     contentEl.appendChild(el);
     console.warn('[Vivaldi Changelog Expander]', err);
   }

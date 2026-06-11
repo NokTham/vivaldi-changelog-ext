@@ -12,8 +12,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   const url = message.url;
 
-  // Basic allowlist — only fetch vivaldi.com blog posts (desktop, android, ios, etc.)
-  if (!/^https:\/\/vivaldi\.com\/blog\//i.test(url)) {
+  // Basic allowlist — only fetch vivaldi.com blog posts or dedicated changelog pages (including hyphenated ones)
+  if (!/^https:\/\/vivaldi\.com\/(blog|changelog)/i.test(url)) {
     sendResponse({ error: 'URL not allowed: ' + url });
     return false;
   }
