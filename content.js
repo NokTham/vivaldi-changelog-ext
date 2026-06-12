@@ -296,6 +296,17 @@
       // Most store links work without query params, but Google Play requires the ?id= parameter.
       let normalized = href.split('#')[0].replace(/\/+$/, '');
       if (!normalized.includes('play.google.com')) {
+        // Specific normalization for Uptodown to handle language subdomains (e.g., .en, .es)
+        if (normalized.includes('uptodown.com')) {
+          try {
+            const urlObj = new URL(normalized);
+            // Check if the hostname is like 'something.lang.uptodown.com'
+            if (urlObj.hostname.split('.').length > 2 && urlObj.hostname.endsWith('uptodown.com')) {
+              urlObj.hostname = urlObj.hostname.replace(/\.[a-z]{2}\.uptodown\.com$/, '.uptodown.com');
+              normalized = urlObj.toString();
+            }
+          } catch (e) { /* Ignore URL parsing errors */ }
+        }
         normalized = normalized.split('?')[0];
       }
 
