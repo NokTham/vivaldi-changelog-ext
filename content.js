@@ -300,7 +300,26 @@
       if (!g.heading) g.heading = 'Changelog';
     }
 
-    return { changelogGroups, downloadGroups, version, platform, releaseType };
+    // Deduplicate downloads: If "Alternative Downloads" exists, prefer it over generic "Download"
+    let finalDownloadGroups = downloadGroups;
+    if (downloadGroups.length > 1) {
+      // Identify if we have specific, high-detail sections (headings with version digits or "alternative")
+      const detailedGroups = downloadGroups.filter(g => g.heading && (/\d/.test(g.heading) || /alternative/i.test(g.heading)));
+
+      if (detailedGroups.length > 0) {
+        finalDownloadGroups = downloadGroups.filter(g => {
+          if (!g.heading) return false;
+          // Keep it if it is a detailed section (contains version numbers or "alternative")
+          if (/\d/.test(g.heading) || /alternative/i.test(g.heading)) return true;
+          
+          // Filter out generic headings if detailed ones exist (e.g., "DOWNLOAD", "Download Vivaldi")
+          const isGeneric = /^\s*(downloads?|download vivaldi|download snapshot|download now)[\s:]*$/i.test(g.heading);
+          return !isGeneric;
+        });
+      }
+    }
+
+    return { changelogGroups, downloadGroups: finalDownloadGroups, version, platform, releaseType };
   }
 
   function extractStoreLinks (entry, blogUrl) {
@@ -439,8 +458,35 @@
     }
 
     // Mobile store links
-    if (storeLinks.length > 0) {
-      wrapper.appendChild(buildStoreSection(storeLinks));
+    const existingUrls = new Set();
+    let hasAlternative = false;
+
+    downloadGroups.forEach(g => {
+      if (g.heading && /alternative/i.test(g.heading)) hasAlternative = true;
+      g.items.forEach(li => {
+        li.querySelectorAll('a[href]').forEach(a => existingUrls.add(a.href));
+      });
+    });
+
+    const filteredStoreLinks = storeLinks.filter(link => {
+      // 1. Remove exact URL duplicates (handles direct APK/EXE links already in the grid)
+      if (existingUrls.has(link.href)) return false;
+
+      // 2. If architecture-specific "Alternative Downloads" exist, hide generic store buttons
+      if (hasAlternative) {
+        // Keep Google Play link, as users might prefer Play Store even for snapshots
+        if (link.label === 'Google Play') return true;
+
+        // Filter out other generic store links (e.g., App Store, TestFlight, generic Vivaldi Download)
+        // as they are often redundant or not applicable for Android snapshots with specific APKs.
+        const otherGenericLabels = ['App Store', 'TestFlight', 'Uptodown', 'Download Vivaldi'];
+        if (otherGenericLabels.includes(link.label)) return false;
+      }
+      return true;
+    });
+
+    if (filteredStoreLinks.length > 0) {
+      wrapper.appendChild(buildStoreSection(filteredStoreLinks));
     }
 
     const sep = document.createElement('hr');
