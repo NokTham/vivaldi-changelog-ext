@@ -411,11 +411,13 @@
     // Toggle Button
     const toggleBtn = document.createElement('button');
     toggleBtn.className = 'vcl-toggle-btn';
-    toggleBtn.setAttribute('aria-label', 'Toggle changelog visibility');
+    toggleBtn.setAttribute('aria-label', 'Toggle changelog');
+    toggleBtn.setAttribute('aria-expanded', 'true');
     toggleBtn.textContent = 'Collapse';
     toggleBtn.onclick = () => {
       const isCollapsed = wrapper.classList.toggle('vcl-collapsed');
       toggleBtn.textContent = isCollapsed ? 'Expand' : 'Collapse';
+      toggleBtn.setAttribute('aria-expanded', !isCollapsed);
     };
 
     // Navigation Buttons
@@ -658,8 +660,9 @@
     icon.className = 'vcl-error-icon';
     icon.textContent = '⚠';
 
-    const text = document.createElement('span');
-    text.textContent = 'Could not load changelog.';
+    const errorMsg = document.createElement('span');
+    errorMsg.className = 'vcl-error-text';
+    errorMsg.textContent = `Error: ${err.message || 'Could not load changelog.'}`;
 
     const link = document.createElement('a');
     link.href = blogUrl;
@@ -667,7 +670,7 @@
     link.rel = 'noopener noreferrer';
     link.textContent = 'Open blog post ↗';
 
-    el.append(icon, text, link);
+    el.append(icon, errorMsg, link);
     contentEl.appendChild(el);
     console.warn('[Vivaldi Changelog Expander]', err);
   }

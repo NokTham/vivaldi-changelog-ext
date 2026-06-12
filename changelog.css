@@ -377,6 +377,12 @@ html body .vcl-changelog .vcl-error {
 }
 
 .vcl-error-icon { color: #f39c12; font-size: 1rem; }
+
+.vcl-error-text {
+  flex: 1;
+  font-weight: 500;
+}
+
 .vcl-error a { color: #ef3939 !important; text-decoration: underline !important; }
 
 /* ── Dark mode ────────────────────────────────────────────────────────────── */
