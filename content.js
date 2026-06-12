@@ -292,8 +292,13 @@
         href = href.replace('http://', 'https://');
       }
 
-      // Normalize URL by removing query params, hashes, and trailing slashes for deduplication
-      const normalized = href.split(/[?#]/)[0].replace(/\/+$/, '');
+      // Normalize URL for deduplication.
+      // Most store links work without query params, but Google Play requires the ?id= parameter.
+      let normalized = href.split('#')[0].replace(/\/+$/, '');
+      if (!normalized.includes('play.google.com')) {
+        normalized = normalized.split('?')[0];
+      }
+
       if (seen.has(normalized)) continue;
 
       for (const { re, label, icon } of STORE_PATTERNS) {
