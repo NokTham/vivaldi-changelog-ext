@@ -26,7 +26,8 @@
 }
 
 /* Force parents to allow stickiness (NodeBB fix) */
-[component="post/content"], .post-container {
+[component="post/content"]:has(.vcl-changelog),
+.post-container:has(.vcl-changelog) {
   overflow: visible !important;
   contain: none !important;
 }
