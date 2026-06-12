@@ -108,8 +108,8 @@
       theme = data.theme;
     }
 
-    // Default to light if no manual preference is set
-    const targetTheme = (theme === 'dark' || theme === 'light') ? theme : 'light';
+    // Default to dark if no manual preference is set
+    const targetTheme = (theme === 'dark' || theme === 'light') ? theme : 'dark';
     
     el.classList.remove('vcl-theme-light', 'vcl-theme-dark');
     el.classList.add(`vcl-theme-${targetTheme}`);
