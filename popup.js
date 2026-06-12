@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (savedInput) {
     savedInput.checked = true;
   } else {
-    document.querySelector('input[value="light"]').checked = true;
+    document.querySelector('input[value="dark"]').checked = true;
   }
 
   radios.forEach(radio => {
