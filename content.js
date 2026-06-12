@@ -98,6 +98,30 @@
     }).observe(document.body, { childList: true, subtree: true });
   }
 
+  // ── Theme management logic ────────────────────────────────────────────────
+
+  async function updateTheme(el, forcedTheme) {
+    let theme = forcedTheme;
+    if (!theme) {
+      const data = await chrome.storage.local.get('theme');
+      theme = data.theme;
+    }
+
+    // Default to light if no manual preference is set
+    const targetTheme = (theme === 'dark' || theme === 'light') ? theme : 'light';
+    
+    el.classList.remove('vcl-theme-light', 'vcl-theme-dark');
+    el.classList.add(`vcl-theme-${targetTheme}`);
+  }
+
+  // Watch for manual settings changes in the popup
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.theme) {
+      const newTheme = changes.theme.newValue;
+      document.querySelectorAll('.vcl-changelog').forEach(el => updateTheme(el, newTheme));
+    }
+  });
+
   async function tryExpandPost (postEl) {
     if (postEl.dataset.clExpandDone) return;
     postEl.dataset.clExpandDone = '1';
@@ -330,7 +354,7 @@
 
   // ── DOM construction ──────────────────────────────────────────────────────
 
-  function injectChangelog (contentEl, { changelogGroups, downloadGroups, storeLinks, version, platform, releaseType, blogUrl }) {
+  async function injectChangelog (contentEl, { changelogGroups, downloadGroups, storeLinks, version, platform, releaseType, blogUrl }) {
     const wrapper = document.createElement('div');
     wrapper.className = 'vcl-changelog';
 
@@ -339,6 +363,9 @@
     const navHeight = (navbar && window.getComputedStyle(navbar).display !== 'none') 
       ? navbar.offsetHeight : 0;
     wrapper.style.setProperty('--vcl-offset', `${navHeight}px`);
+
+    // Apply initial theme based on manual settings
+    await updateTheme(wrapper);
 
     // Header
     const header = document.createElement('div');

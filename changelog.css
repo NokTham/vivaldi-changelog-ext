@@ -2,6 +2,29 @@
    Vivaldi Changelog Expander — injected styles
    ───────────────────────────────────────────────────────────────────────── */
 
+
+.vcl-theme-light {
+  --vcl-bg: rgba(239, 57, 57, 0.03) !important;
+  --vcl-text: #333 !important;
+  --vcl-border: rgba(239, 57, 57, 0.18) !important;
+  --vcl-sec-bg: rgba(0, 0, 0, 0.015) !important;
+  --vcl-label: #444 !important;
+  --vcl-muted: #666 !important;
+  --vcl-pill-bg: rgba(239, 57, 57, 0.07) !important;
+  --vcl-pill-border: rgba(239, 57, 57, 0.3) !important;
+}
+
+.vcl-theme-dark {
+  --vcl-bg: rgba(239, 57, 57, 0.04) !important;
+  --vcl-text: rgba(255, 255, 255, 0.85) !important;
+  --vcl-border: rgba(239, 57, 57, 0.22) !important;
+  --vcl-sec-bg: rgba(255, 255, 255, 0.03) !important;
+  --vcl-label: rgba(255, 255, 255, 0.8) !important;
+  --vcl-muted: rgba(255, 255, 255, 0.6) !important;
+  --vcl-pill-bg: rgba(239, 57, 57, 0.1) !important;
+  --vcl-pill-border: rgba(239, 57, 57, 0.35) !important;
+}
+
 /* Force parents to allow stickiness (NodeBB fix) */
 [component="post/content"], .post-container {
   overflow: visible !important;
@@ -17,14 +40,16 @@
 }
 
 /* ── Wrapper ──────────────────────────────────────────────────────────────── */
-.vcl-changelog {
+html body .vcl-changelog {
   margin-top: 0.75rem;
-  border: 1.5px solid rgba(239, 57, 57, 0.18);
+  border: 1.5px solid var(--vcl-border);
   border-radius: 8px;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 0.875rem;
-  background: rgba(239, 57, 57, 0.03);
+  background: var(--vcl-bg);
+  color: var(--vcl-text) !important;
   box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+  transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
   animation: vcl-fade-in 0.3s ease;
 }
 
@@ -174,11 +199,11 @@
   list-style: none !important;
 }
 
-.vcl-list li {
+html body .vcl-changelog .vcl-list li {
   position: relative;
   padding: 0.26rem 0 !important;
   line-height: 1.5 !important;
-  color: var(--color-text, inherit) !important;
+  color: var(--vcl-text) !important;
   border-bottom: 1px solid rgba(0,0,0,0.04);
   font-size: 0.82rem !important;
 }
@@ -218,7 +243,7 @@
 
 /* ── Desktop download section ─────────────────────────────────────────────── */
 .vcl-downloads {
-  background: rgba(0,0,0,0.015);
+  background: var(--vcl-sec-bg);
 }
 
 .vcl-dl-grid {
@@ -234,10 +259,10 @@
   flex-wrap: wrap;
 }
 
-.vcl-dl-label {
+html body .vcl-changelog .vcl-dl-label {
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--color-text, #333);
+  color: var(--vcl-label) !important;
   min-width: 110px;
   flex-shrink: 0;
 }
@@ -255,8 +280,8 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #ef3939 !important;
-  background: rgba(239, 57, 57, 0.07);
-  border: 1.5px solid rgba(239, 57, 57, 0.3);
+  background: var(--vcl-pill-bg);
+  border: 1.5px solid var(--vcl-pill-border);
   border-radius: 4px;
   padding: 2px 8px;
   text-decoration: none !important;
@@ -306,7 +331,7 @@
 }
 
 /* ── Loading indicator ────────────────────────────────────────────────────── */
-.vcl-loader {
+html body .vcl-changelog .vcl-loader {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -314,7 +339,7 @@
   padding: 0.5rem 0;
   opacity: 0.65;
   font-size: 0.8rem;
-  color: var(--color-text, inherit);
+  color: var(--vcl-muted) !important;
 }
 
 .vcl-loader-dot {
@@ -337,7 +362,7 @@
 .vcl-loader-text { margin-left: 4px; }
 
 /* ── Error state ──────────────────────────────────────────────────────────── */
-.vcl-error {
+html body .vcl-changelog .vcl-error {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -347,7 +372,7 @@
   background: rgba(243, 156, 18, 0.07);
   border-radius: 0 4px 4px 0;
   font-size: 0.8rem;
-  color: var(--color-text, inherit);
+  color: var(--vcl-label) !important;
   flex-wrap: wrap;
 }
 
@@ -355,29 +380,21 @@
 .vcl-error a { color: #ef3939 !important; text-decoration: underline !important; }
 
 /* ── Dark mode ────────────────────────────────────────────────────────────── */
-@media (prefers-color-scheme: dark) {
-  .vcl-changelog {
-    background: rgba(239, 57, 57, 0.04);
-    border-color: rgba(239, 57, 57, 0.22);
-  }
-  .vcl-sep { opacity: 0.2; }
-  .vcl-list li { border-color: rgba(255,255,255,0.06); }
-  .vcl-downloads { background: rgba(255,255,255,0.03); }
-  .vcl-ticket {
+/* These apply specifically when the dark theme is active */
+.vcl-theme-dark .vcl-sep { opacity: 0.2; }
+
+.vcl-theme-dark .vcl-ticket {
     background: rgba(239, 57, 57, 0.12);
     border-color: rgba(239, 57, 57, 0.28);
     color: #ff6b6b;
-  }
-  .vcl-dl-label { color: rgba(255,255,255,0.8); }
-  .vcl-dl-pill {
-    background: rgba(239, 57, 57, 0.1);
-    border-color: rgba(239, 57, 57, 0.35);
-    color: #ff6b6b !important;
-  }
-  .vcl-dl-pill:hover {
+}
+
+.vcl-theme-dark .vcl-dl-pill { color: #ff6b6b !important; }
+
+.vcl-theme-dark .vcl-dl-pill:hover {
     background: #c0392b !important;
     border-color: #c0392b !important;
     color: #fff !important;
-  }
-  .vcl-store-btn:hover { background: #a93226 !important; }
 }
+
+.vcl-theme-dark .vcl-store-btn:hover { background: #a93226 !important; }
