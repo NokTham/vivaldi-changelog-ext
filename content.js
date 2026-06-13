@@ -105,7 +105,11 @@
    * Detects the forum's current theme by inspecting the internal NodeBB config script.
    */
   function getForumTheme() {
-    // 1. Try to extract the skin setting from the forum's configuration script
+    // 1. Check for data attribute on body (standard NodeBB/Bootswatch practice)
+    const bodySkin = document.body.getAttribute('data-bootswatch-skin');
+    if (bodySkin === 'dark' || bodySkin === 'light') return bodySkin;
+
+    // 2. Try to extract the skin setting from the forum's configuration script
     const scripts = document.getElementsByTagName('script');
     for (let i = 0; i < scripts.length; i++) {
       const content = scripts[i].textContent;
@@ -115,10 +119,10 @@
       }
     }
 
-    // 2. Fallback: Check if the <html> tag has the 'dark' class
+    // 3. Fallback: Check if the <html> tag has the 'dark' class
     if (document.documentElement.classList.contains('dark')) return 'dark';
 
-    // 3. Last Resort: Fallback to system preference
+    // 4. Last Resort: Fallback to system preference
     return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
   }
 
@@ -434,10 +438,12 @@
     const toggleBtn = document.createElement('button');
     toggleBtn.className = 'vcl-toggle-btn';
     toggleBtn.setAttribute('aria-label', 'Toggle changelog visibility');
+    toggleBtn.setAttribute('aria-expanded', 'true');
     toggleBtn.textContent = 'Collapse';
     toggleBtn.onclick = () => {
       const isCollapsed = wrapper.classList.toggle('vcl-collapsed');
       toggleBtn.textContent = isCollapsed ? 'Expand' : 'Collapse';
+      toggleBtn.setAttribute('aria-expanded', !isCollapsed);
     };
 
     // Navigation Buttons
@@ -681,7 +687,7 @@
     icon.textContent = '⚠';
 
     const text = document.createElement('span');
-    text.textContent = 'Could not load changelog.';
+    text.textContent = err.message || 'Could not load changelog.';
 
     const link = document.createElement('a');
     link.href = blogUrl;
