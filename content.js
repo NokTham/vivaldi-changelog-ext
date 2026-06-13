@@ -40,10 +40,9 @@
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   function platformFromUrl (url) {
-    if (/android/i.test(url)) return { label: 'Android', emoji: '🤖' };
-    if (/ios/i.test(url))     return { label: 'iOS',     emoji: '🍎' };
-    if (/mobile/i.test(url))  return { label: 'Mobile',  emoji: '📱' };
-    return                    { label: 'Desktop', emoji: '🖥' };
+    if (/\/blog\/android\//i.test(url)) return { label: 'Android', emoji: '🤖' };
+    if (/\/blog\/ios\//i.test(url))     return { label: 'iOS',     emoji: '🍎' };
+    return                                     { label: 'Desktop', emoji: '🖥' };
   }
 
   function releaseTypeFromUrl (url) {
@@ -101,26 +100,43 @@
 
   // ── Theme management logic ────────────────────────────────────────────────
 
-  async function updateTheme(el, forcedTheme) {
-    let theme = forcedTheme;
-    if (!theme) {
-      const data = await chrome.storage.local.get('theme');
-      theme = data.theme;
+  /**
+   * Detects the forum's current theme by inspecting the internal NodeBB config script.
+   */
+  function getForumTheme() {
+    // 1. Try to extract the skin setting from the forum's configuration script
+    const scripts = document.getElementsByTagName('script');
+    for (let i = 0; i < scripts.length; i++) {
+      const content = scripts[i].textContent;
+      if (content.includes('bootswatchSkin')) {
+        const match = content.match(/"bootswatchSkin":"(light|dark)"/);
+        if (match) return match[1];
+      }
     }
 
-    // Default to dark if no manual preference is set
-    const targetTheme = (theme === 'dark' || theme === 'light') ? theme : 'dark';
+    // 2. Fallback: Check if the <html> tag has the 'dark' class
+    if (document.documentElement.classList.contains('dark')) return 'dark';
+
+    // 3. Last Resort: Fallback to system preference
+    return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  }
+
+  function updateTheme(el) {
+    const targetTheme = getForumTheme();
     
     el.classList.remove('vcl-theme-light', 'vcl-theme-dark');
     el.classList.add(`vcl-theme-${targetTheme}`);
   }
 
-  // Watch for manual settings changes in the popup
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.theme) {
-      const newTheme = changes.theme.newValue;
-      document.querySelectorAll('.vcl-changelog').forEach(el => updateTheme(el, newTheme));
-    }
+  // Watch for page-level theme changes (the 'dark' class on <html>)
+  // NodeBB usually reloads on skin change, but this ensures sync without refresh if possible.
+  const themeObserver = new MutationObserver(() => {
+    document.querySelectorAll('.vcl-changelog').forEach(el => updateTheme(el));
+  });
+  
+  themeObserver.observe(document.documentElement, { 
+    attributes: true, 
+    attributeFilter: ['class'] 
   });
 
   async function tryExpandPost (postEl) {
@@ -159,6 +175,11 @@
 
   async function fetchChangelog (blogUrl) {
     const fetchHtml = (urlToFetch) => new Promise((resolve, reject) => { // Renamed parameter for clarity
+      if (!chrome.runtime?.id) {
+        reject(new Error('Extension context invalidated. Please refresh the page.'));
+        return;
+      }
+
       chrome.runtime.sendMessage({ type: 'FETCH_URL', url: urlToFetch }, (r) => {
         if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
         else if (r?.error)            reject(new Error(r.error));
@@ -301,26 +322,7 @@
       if (!g.heading) g.heading = 'Changelog';
     }
 
-    // Deduplicate downloads: If "Alternative Downloads" exists, prefer it over generic "Download"
-    let finalDownloadGroups = downloadGroups;
-    if (downloadGroups.length > 1) {
-      // Identify if we have specific, high-detail sections (headings with version digits or "alternative")
-      const detailedGroups = downloadGroups.filter(g => g.heading && (/\d/.test(g.heading) || /alternative/i.test(g.heading)));
-
-      if (detailedGroups.length > 0) {
-        finalDownloadGroups = downloadGroups.filter(g => {
-          if (!g.heading) return false;
-          // Keep it if it is a detailed section (contains version numbers or "alternative")
-          if (/\d/.test(g.heading) || /alternative/i.test(g.heading)) return true;
-          
-          // Filter out generic headings if detailed ones exist (e.g., "DOWNLOAD", "Download Vivaldi")
-          const isGeneric = /^\s*(downloads?|download vivaldi|download snapshot|download now)[\s:]*$/i.test(g.heading);
-          return !isGeneric;
-        });
-      }
-    }
-
-    return { changelogGroups, downloadGroups: finalDownloadGroups, version, platform, releaseType };
+    return { changelogGroups, downloadGroups, version, platform, releaseType };
   }
 
   function extractStoreLinks (entry, blogUrl) {
@@ -385,7 +387,7 @@
     wrapper.style.setProperty('--vcl-offset', `${navHeight}px`);
 
     // Apply initial theme based on manual settings
-    await updateTheme(wrapper);
+    updateTheme(wrapper);
 
     // Header
     const header = document.createElement('div');
@@ -411,13 +413,11 @@
     // Toggle Button
     const toggleBtn = document.createElement('button');
     toggleBtn.className = 'vcl-toggle-btn';
-    toggleBtn.setAttribute('aria-label', 'Toggle changelog');
-    toggleBtn.setAttribute('aria-expanded', 'true');
+    toggleBtn.setAttribute('aria-label', 'Toggle changelog visibility');
     toggleBtn.textContent = 'Collapse';
     toggleBtn.onclick = () => {
       const isCollapsed = wrapper.classList.toggle('vcl-collapsed');
       toggleBtn.textContent = isCollapsed ? 'Expand' : 'Collapse';
-      toggleBtn.setAttribute('aria-expanded', !isCollapsed);
     };
 
     // Navigation Buttons
@@ -461,35 +461,8 @@
     }
 
     // Mobile store links
-    const existingUrls = new Set();
-    let hasAlternative = false;
-
-    downloadGroups.forEach(g => {
-      if (g.heading && /alternative/i.test(g.heading)) hasAlternative = true;
-      g.items.forEach(li => {
-        li.querySelectorAll('a[href]').forEach(a => existingUrls.add(a.href));
-      });
-    });
-
-    const filteredStoreLinks = storeLinks.filter(link => {
-      // 1. Remove exact URL duplicates (handles direct APK/EXE links already in the grid)
-      if (existingUrls.has(link.href)) return false;
-
-      // 2. If architecture-specific "Alternative Downloads" exist, hide generic store buttons
-      if (hasAlternative) {
-        // Keep Google Play link, as users might prefer Play Store even for snapshots
-        if (link.label === 'Google Play') return true;
-
-        // Filter out other generic store links (e.g., App Store, TestFlight, generic Vivaldi Download)
-        // as they are often redundant or not applicable for Android snapshots with specific APKs.
-        const otherGenericLabels = ['App Store', 'TestFlight', 'Uptodown', 'Download Vivaldi'];
-        if (otherGenericLabels.includes(link.label)) return false;
-      }
-      return true;
-    });
-
-    if (filteredStoreLinks.length > 0) {
-      wrapper.appendChild(buildStoreSection(filteredStoreLinks));
+    if (storeLinks.length > 0) {
+      wrapper.appendChild(buildStoreSection(storeLinks));
     }
 
     const sep = document.createElement('hr');
@@ -660,9 +633,8 @@
     icon.className = 'vcl-error-icon';
     icon.textContent = '⚠';
 
-    const errorMsg = document.createElement('span');
-    errorMsg.className = 'vcl-error-text';
-    errorMsg.textContent = `Error: ${err.message || 'Could not load changelog.'}`;
+    const text = document.createElement('span');
+    text.textContent = 'Could not load changelog.';
 
     const link = document.createElement('a');
     link.href = blogUrl;
@@ -670,7 +642,7 @@
     link.rel = 'noopener noreferrer';
     link.textContent = 'Open blog post ↗';
 
-    el.append(icon, errorMsg, link);
+    el.append(icon, text, link);
     contentEl.appendChild(el);
     console.warn('[Vivaldi Changelog Expander]', err);
   }

@@ -16,7 +16,7 @@ A Chromium extension for `forum.vivaldi.net` that inlines changelog data from Vi
 - **Inline Rendering:** Displays changelog sections, version info, and platform badges.
 - **Ticket Highlighting:** Detects and badges Vivaldi bug tracker IDs (e.g., VB-XXXXX, VAB-XXXXX).
 - **Download Management:** Organizes architecture-specific links into grids and deduplicates store links.
-- **Theme Support:** Manual toggle between Light and Dark modes via the extension popup.
+- **Theme Support:** Automatically synchronizes with the Vivaldi Forum theme settings.
 - **SPA Support:** Uses `MutationObserver` to handle NodeBB's client-side navigation.
 
 ## Installation
