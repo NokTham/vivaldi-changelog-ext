@@ -40,9 +40,10 @@
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   function platformFromUrl (url) {
-    if (/\/blog\/android\//i.test(url)) return { label: 'Android', emoji: '🤖' };
-    if (/\/blog\/ios\//i.test(url))     return { label: 'iOS',     emoji: '🍎' };
-    return                                     { label: 'Desktop', emoji: '🖥' };
+    if (/android/i.test(url)) return { label: 'Android', emoji: '🤖' };
+    if (/ios/i.test(url))     return { label: 'iOS',     emoji: '🍎' };
+    if (/mobile/i.test(url))  return { label: 'Mobile',  emoji: '📱' };
+    return                    { label: 'Desktop', emoji: '🖥' };
   }
 
   function releaseTypeFromUrl (url) {
