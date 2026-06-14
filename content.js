@@ -9,6 +9,10 @@
 
   // ── Constants ─────────────────────────────────────────────────────────────
 
+  // Target specific Vivaldi Forum categories:
+  // 74: Desktop Stable News, 83: Desktop Snapshots, 139: Mobile Stable News, 155: Mobile Snapshots
+  const ALLOWED_CATEGORIES = [74, 83, 139, 155];
+
   // Any vivaldi.com blog post link
   const BLOG_LINK_RE = /^https?:\/\/vivaldi\.com\/blog\//i;
 
@@ -146,6 +150,13 @@
 
   async function tryExpandPost (postEl) {
     if (postEl.dataset.clExpandDone) return;
+
+    // Only process threads in announcement/snapshot categories
+    const topic = postEl.closest('[component="topic"]');
+    if (!topic) return;
+    const cid = parseInt(topic.getAttribute('data-cid'), 10);
+    if (!ALLOWED_CATEGORIES.includes(cid)) return;
+
     postEl.dataset.clExpandDone = '1';
 
     const contentEl = postEl.querySelector('[component="post/content"]');
@@ -200,29 +211,47 @@
     const blogEntry = docBlog.querySelector('.entry-content, .post-content, main, article, #content');
     const storeLinks = blogEntry ? extractStoreLinks(blogEntry, blogUrl) : [];
 
-    // 3. Determine which document contains the main changelog content
-    let changelogDoc = docBlog;
-    let changelogSourceUrl = blogUrl; // The URL from which changelogDoc was fetched
-    // Match links containing "vivaldi.com/changelog" to catch both /changelog/ and /changelog- slugs
-    const fullLink = docBlog.querySelector('a[href*="vivaldi.com/changelog"]');
+    // 3. Identify and process changelog sources
+    // Search for dedicated changelog links within the blog entry content to avoid navigation menus
+    const fullLinks = blogEntry 
+      ? Array.from(blogEntry.querySelectorAll('a[href*="vivaldi.com/changelog"]'))
+      : [];
+    
+    const uniqueUrls = [...new Set(fullLinks.map(a => a.href))];
+    const changelogGroups = [];
+    const downloadGroups = [];
+    let version = null, platform = null, releaseType = null;
 
-    if (fullLink) {
-      // Prioritize the dedicated changelog page if a link is found
-      const fullChangelogUrl = fullLink.href;
-      const respFull = await fetchHtml(fullChangelogUrl);
-      changelogDoc = new DOMParser().parseFromString(respFull.html, 'text/html');
-      changelogSourceUrl = fullChangelogUrl;
+    if (uniqueUrls.length > 0) {
+      // Fetch and parse each dedicated changelog page
+      for (const url of uniqueUrls) {
+        try {
+          const resp = await fetchHtml(url);
+          const doc = new DOMParser().parseFromString(resp.html, 'text/html');
+          const parsed = parseChangelogAndDownloads(doc, url, blogUrl);
+          
+          changelogGroups.push(...parsed.changelogGroups);
+          downloadGroups.push(...parsed.downloadGroups);
+          
+          if (!version) version = parsed.version;
+          if (!platform) platform = parsed.platform;
+          if (!releaseType) releaseType = parsed.releaseType;
+        } catch (e) {
+          console.warn(`[Vivaldi Changelog Expander] Failed to fetch sub-changelog: ${url}`, e);
+        }
+      }
+    } else {
+      // Fallback to parsing the blog post directly
+      const parsed = parseChangelogAndDownloads(docBlog, blogUrl, blogUrl);
+      changelogGroups.push(...parsed.changelogGroups);
+      downloadGroups.push(...parsed.downloadGroups);
+      version = parsed.version;
+      platform = parsed.platform;
+      releaseType = parsed.releaseType;
     }
 
-    // 4. Parse the changelog and download groups from the chosen document
-    const { changelogGroups, downloadGroups, version, platform, releaseType } =
-      parseChangelogAndDownloads(changelogDoc, changelogSourceUrl, blogUrl);
-
-    // 5. Combine all data
     if (changelogGroups.length === 0 && downloadGroups.length === 0 && storeLinks.length === 0) {
-      // If we parsed a dedicated changelog page and it was empty, or if the blog post was empty.
-      // The error message now indicates which URL was ultimately parsed for content.
-      throw new Error(`No changelog content found in ${changelogSourceUrl}.`);
+      throw new Error(`No changelog content found for ${blogUrl}.`);
     }
 
     return { changelogGroups, downloadGroups, storeLinks, version, platform, releaseType, blogUrl };
@@ -308,13 +337,11 @@
         continue;
       }
 
-      // Keep items that look like changelog entries; drop obvious nav/store items
-      const clItems = g.items.filter(li => CHANGELOG_ITEM_RE.test(li.textContent));
-
-      if (clItems.length > 0) {
-        changelogGroups.push({ heading: g.heading, items: clItems }); // Found specific changelog items
-      } else if (g.items.length > 0 && !g.heading) { // Items with no heading, not matching changelog regex
-        // Items under no heading that aren't changelog — ignore (likely store blurb)
+      // If any item in the group matches the changelog pattern, we treat the entire group 
+      // as a changelog. This prevents valid items like version bumps (e.g., "Upgraded to...")
+      // from being stripped when they appear alongside standard entries.
+      if (g.items.some(li => CHANGELOG_ITEM_RE.test(li.textContent))) {
+        changelogGroups.push(g);
       } else if (g.items.length > 0 && g.heading) { // Named group with items, but no specific changelog items
         // Named non-download group with no changelog items — pass through as-is
         // (e.g. "Known Issues", "Release candidate feedback")
