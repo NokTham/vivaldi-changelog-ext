@@ -149,7 +149,12 @@
   });
 
   async function tryExpandPost (postEl) {
-    if (postEl.dataset.clExpandDone) return;
+    const pid = postEl.getAttribute('data-pid') || '0';
+    const contentEl = postEl.querySelector('[component="post/content"]');
+    if (!contentEl) return;
+
+    const hasChangelog = contentEl.querySelector('.vcl-changelog, .vcl-loader, .vcl-error');
+    if (postEl.dataset.clExpandDone && postEl.dataset.clExpandPid === pid && hasChangelog) return;
 
     // Only process threads in announcement/snapshot categories
     const topic = postEl.closest('[component="topic"]');
@@ -158,9 +163,7 @@
     if (!ALLOWED_CATEGORIES.includes(cid)) return;
 
     postEl.dataset.clExpandDone = '1';
-
-    const contentEl = postEl.querySelector('[component="post/content"]');
-    if (!contentEl) return;
+    postEl.dataset.clExpandPid = pid;
 
     let blogUrl = null;
     for (const a of contentEl.querySelectorAll('a[href]')) {
@@ -176,7 +179,12 @@
       injectChangelog(contentEl, data);
     } catch (err) {
       loader.remove();
-      injectError(contentEl, err, blogUrl);
+      const isReleaseUrl = /snapshot|update|stable|release|rc|beta|minor/i.test(blogUrl);
+      if (isReleaseUrl) {
+        injectError(contentEl, err, blogUrl);
+      } else {
+        console.log('[Vivaldi Changelog Expander] No changelog found for non-release post, skipping silently.');
+      }
     }
   }
 
@@ -196,11 +204,15 @@
         return;
       }
 
-      chrome.runtime.sendMessage({ type: 'FETCH_URL', url: urlToFetch }, (r) => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else if (r?.error)            reject(new Error(r.error));
-        else                          resolve(r);
-      });
+      try {
+        chrome.runtime.sendMessage({ type: 'FETCH_URL', url: urlToFetch }, (r) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else if (r?.error)            reject(new Error(r.error));
+          else                          resolve(r);
+        });
+      } catch (e) {
+        reject(new Error('Extension connection lost. Please refresh the page.'));
+      }
     });
 
     // 1. Fetch and parse the original blog post
@@ -267,8 +279,8 @@
 
     // Version: prefer a 4-part build number, fall back to 2-part x.x
     const versionMatch =
-      metadataSourceUrl.match(/\b(\d+\.\d+\.\d+[\.\d]*)\b/) ||
-      doc.title.match(/\b(\d+\.\d+[\.\d]*)\b/);
+      metadataSourceUrl.match(/\b(\d+[-.]\d+[-.]\d+[-.\d]*)\b/) ||
+      doc.title.match(/\b(\d+[-.]\d+[-.\d]*)\b/);
     const version = versionMatch
       ? versionMatch[1].replace(/-/g, '.')
       : null;
@@ -465,12 +477,23 @@
     const toggleBtn = document.createElement('button');
     toggleBtn.className = 'vcl-toggle-btn';
     toggleBtn.setAttribute('aria-label', 'Toggle changelog visibility');
-    toggleBtn.setAttribute('aria-expanded', 'true');
-    toggleBtn.textContent = 'Collapse';
+    
+    // Read user preference
+    const isCollapsedDefault = localStorage.getItem('vcl_collapsed_default') === 'true';
+    if (isCollapsedDefault) {
+      wrapper.classList.add('vcl-collapsed');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+      toggleBtn.textContent = 'Expand';
+    } else {
+      toggleBtn.setAttribute('aria-expanded', 'true');
+      toggleBtn.textContent = 'Collapse';
+    }
+
     toggleBtn.onclick = () => {
       const isCollapsed = wrapper.classList.toggle('vcl-collapsed');
       toggleBtn.textContent = isCollapsed ? 'Expand' : 'Collapse';
       toggleBtn.setAttribute('aria-expanded', !isCollapsed);
+      localStorage.setItem('vcl_collapsed_default', isCollapsed.toString());
     };
 
     // Navigation Buttons
@@ -670,7 +693,9 @@
         last = m.index + m[0].length;
       }
       if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
-      node.parentNode.replaceChild(frag, node);
+      if (node.parentNode) {
+        node.parentNode.replaceChild(frag, node);
+      }
     });
   }
 

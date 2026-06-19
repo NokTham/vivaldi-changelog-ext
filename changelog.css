@@ -55,7 +55,12 @@ html body .vcl-changelog {
 }
 
 .vcl-changelog.vcl-collapsed .vcl-section {
-  display: none;
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-top-color: transparent;
+  pointer-events: none;
 }
 
 .vcl-changelog.vcl-collapsed .vcl-header {
@@ -177,6 +182,13 @@ html body .vcl-changelog {
 .vcl-section {
   padding: 0.75rem 1rem;
   border-top: 1px solid rgba(239, 57, 57, 0.1);
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              opacity 0.25s ease, 
+              padding 0.3s ease,
+              border-top-color 0.3s ease;
+  max-height: 2500px;
+  opacity: 1;
+  overflow: hidden;
 }
 
 .vcl-section:first-of-type {
